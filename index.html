@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101321">
+  <title>Daily Games — Launcher</title>
+  <style>
+    :root{color-scheme:dark;font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;background:#101321;color:#f3f4fb}
+    *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:28px 16px;background:radial-gradient(ellipse at 50% 0%,#262846 0%,#101321 60%)}
+    main{width:min(100%,640px)}.eyebrow{color:#bcb2ff;font-weight:700;letter-spacing:.15em;font-size:12px;text-transform:uppercase;margin:0 0 12px}
+    h1{font-size:clamp(32px,6vw,48px);margin:0 0 7px;letter-spacing:-.045em}p{color:#aeb5cc;line-height:1.55}.intro{margin:0 0 27px}
+    .panel{background:#191e31;border:1px solid #333b56;border-radius:20px;padding:20px;box-shadow:0 18px 70px #05070f50}
+    .top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}.top b{font-size:14px}.small{color:#98a3c2;font-size:13px}
+    .game{display:flex;align-items:center;gap:13px;padding:13px 8px;border-top:1px solid #30364c}.game input{width:18px;height:18px;accent-color:#a38bff;cursor:pointer;flex-shrink:0}
+    .game a{color:#f3f4fb;text-decoration:none;font-weight:600;flex:1;overflow-wrap:anywhere}.game a:hover{text-decoration:underline;color:#c4b8ff}.external{color:#99a2bc;font-size:12px;text-decoration:none}
+    .actions{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:20px}button{font:inherit;border:0;border-radius:11px;padding:14px 16px;cursor:pointer;font-weight:750}
+    button.primary{background:#a891ff;color:#17112c}button.primary:hover{background:#c0afff}button.secondary{background:#30364d;color:#ebedfb}button.secondary:hover{background:#404962}
+    button:disabled{cursor:not-allowed;opacity:.45}.status{margin:15px 0 0;font-size:13px;min-height:20px}.status.warn{color:#ffd39b}.status.ok{color:#a6e9c4}
+    footer{font-size:12px;color:#7985a4;text-align:center;margin-top:22px}code{font-size:.95em;color:#dbcfff}
+    @media(max-width:420px){.actions{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+  <main>
+    <p class="eyebrow">Game night</p>
+    <h1>Daily Games 🎮</h1>
+    <p class="intro">The nightly ritual. Select the games you want, then open them all in one go.</p>
+    <section class="panel" aria-label="Daily games">
+      <div class="top"><b>Tonight's lineup</b><span id="count" class="small"></span></div>
+      <div id="games"></div>
+      <div class="actions">
+        <button class="primary" id="launch" type="button">🚀 Launch selected games</button>
+        <button class="secondary" id="toggle" type="button">Deselect all</button>
+      </div>
+      <p id="status" class="status" aria-live="polite"></p>
+    </section>
+    <footer>Links open in new tabs. Your selections are saved only in this browser.</footer>
+  </main>
+  <script>
+    // EDIT YOUR MASTER GAME LIST HERE. Add or remove lines as needed.
+    // Keep the format: { name: "Game name", url: "https://example.com" },
+    const GAMES = [
+      { name: "Crosstune", url: "https://crosstune.io/" },
+      { name: "Raddle", url: "https://raddle.quest/" },
+      { name: "Contexto", url: "https://contexto.me/en/daily" },
+      { name: "Framed", url: "https://framed.wtf/" },
+      { name: "Spotle Movies", url: "https://spotle.movie/" },
+      { name: "Spotle Music", url: "https://spotle.io/" },
+      { name: "Thingdle", url: "https://thingdle.app/en/thingdle" },
+      { name: "Globle", url: "https://globle-game.com/game" },
+      { name: "Krillion", url: "https://krillion.io/" },
+      { name: "ANNO", url: "https://anno-game.netlify.app/" },
+      { name: "Catfishing", url: "https://catfishing.net/" },
+      { name: "Daily Orbs", url: "https://dailyorbs.com/" },
+      { name: "Travle", url: "https://travle.earth/" },
+      { name: "TimeGuessr", url: "https://timeguessr.com/play?mode=daily" },
+      { name: "NYT Crossword", url: "https://www.nytimes.com/crosswords/game/daily" },
+      { name: "Scrandle", url: "https://scrandle.com/" }
+    ];
+
+    const storageKey = 'daily-games-selected-v1';
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(storageKey) || '{}') || {}; } catch { saved = {}; }
+    const selected = new Map(GAMES.map(g => [g.url, saved[g.url] !== false]));
+    const gamesEl = document.getElementById('games');
+    const countEl = document.getElementById('count');
+    const launchEl = document.getElementById('launch');
+    const toggleEl = document.getElementById('toggle');
+    const statusEl = document.getElementById('status');
+    function save() { try { localStorage.setItem(storageKey, JSON.stringify(Object.fromEntries(selected))); } catch {} }
+    function render() {
+      gamesEl.replaceChildren();
+      for (const game of GAMES) {
+        const row = document.createElement('div'); row.className = 'game';
+        const checkbox = document.createElement('input'); checkbox.type='checkbox'; checkbox.checked=selected.get(game.url); checkbox.setAttribute('aria-label',`Include ${game.name}`);
+        checkbox.addEventListener('change',()=>{selected.set(game.url,checkbox.checked);save();render();});
+        const link=document.createElement('a');link.href=game.url;link.target='_blank';link.rel='noopener noreferrer';link.textContent=game.name;link.title='Open '+game.name+' in a new tab';
+        const external=document.createElement('span');external.className='external';external.textContent='↗';external.setAttribute('aria-hidden','true');
+        row.append(checkbox,link,external);gamesEl.append(row);
+      }
+      const n=[...selected.values()].filter(Boolean).length;
+      countEl.textContent=`${n} of ${GAMES.length} selected`;
+      launchEl.disabled=n===0;
+      toggleEl.textContent=n===GAMES.length?'Deselect all':'Select all';
+    }
+    toggleEl.addEventListener('click',()=>{const all=[...selected.values()].every(Boolean); for(const key of selected.keys())selected.set(key,!all);save();render();statusEl.textContent='';});
+    launchEl.addEventListener('click',()=>{
+      const urls=GAMES.filter(g=>selected.get(g.url)).map(g=>g.url);
+      let opened=0;
+      // Synchronous openings matter: deferring with a timer commonly triggers blockers.
+      for(const url of urls){const tab=window.open(url,'_blank');if(tab){opened++;try{tab.opener=null;}catch{}}}
+      if(opened<urls.length){statusEl.className='status warn';statusEl.textContent=`${opened} of ${urls.length} tabs opened. Allow popups and redirects for this site in your browser, then click Launch again. (Some browsers may still limit bulk opening.)`;}
+      else{statusEl.className='status ok';statusEl.textContent=`Requested ${opened} tabs. If any are missing, check your browser's popup settings.`;}
+    });
+    render();
+  </script>
+</body>
+</html>
