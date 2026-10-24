@@ -17,11 +17,29 @@
     .actions{display:grid;grid-template-columns:1fr auto;gap:10px;margin-top:20px}button{font:inherit;border:0;border-radius:11px;padding:14px 16px;cursor:pointer;font-weight:750}
     button.primary{background:#a891ff;color:#17112c}button.primary:hover{background:#c0afff}button.secondary{background:#30364d;color:#ebedfb}button.secondary:hover{background:#404962}
     button:disabled{cursor:not-allowed;opacity:.45}.status{margin:15px 0 0;font-size:13px;min-height:20px}.status.warn{color:#ffd39b}.status.ok{color:#a6e9c4}
+    .help-toggle{display:block;margin-top:12px;background:transparent;color:#c5b6ff;border:1px solid #596082;padding:10px 12px;font-size:13px;width:100%;text-align:left}.help-toggle:hover{background:#30364d}
+    .help-panel{margin-top:12px;border:1px solid #596082;background:#222840;border-radius:12px;padding:16px;color:#e4e6f3;font-size:14px;line-height:1.6}.help-panel[hidden]{display:none}.help-panel h2{font-size:16px;margin:0 0 8px}.help-panel ol{margin:8px 0 8px 20px;padding:0}.help-panel li{margin:6px 0}.help-panel p{font-size:13px;margin:8px 0 0}.help-panel strong{color:#fff}
+    .popup-overlay[hidden]{display:none}.popup-overlay{position:fixed;inset:0;z-index:9999;background:rgba(4,7,19,.76);pointer-events:auto}
+    .popup-callout{position:fixed;top:92px;width:min(370px,calc(100vw - 24px));background:#282e4b;color:#fff;border:2px solid #bbacff;border-radius:18px;padding:20px;box-shadow:0 16px 65px #000b;line-height:1.5}
+    .popup-overlay.left .popup-callout{left:12px}.popup-overlay.right .popup-callout{right:12px}.popup-overlay.center .popup-callout{left:50%;transform:translateX(-50%)}
+    .popup-callout h2{font-size:21px;margin:0 0 8px;color:white}.popup-callout p{color:#e1ddf9;margin:0 0 12px;font-size:15px}.popup-callout button{width:100%;background:#a891ff;color:#17112c}
+    .pointer{position:absolute;top:-88px;font-size:82px;line-height:1;color:#ffc777;text-shadow:0 0 22px #f2a73f;animation:arrow-bob 1s ease-in-out infinite alternate;pointer-events:none}
+    .left .pointer{left:17px;transform:rotate(0)}.right .pointer{right:17px}.center .pointer{display:none}
+    @keyframes arrow-bob{from{translate:0 0}to{translate:0 -13px}}
+    @media(prefers-reduced-motion:reduce){.pointer{animation:none}}
     footer{font-size:12px;color:#7985a4;text-align:center;margin-top:22px}code{font-size:.95em;color:#dbcfff}
     @media(max-width:420px){.actions{grid-template-columns:1fr}}
   </style>
 </head>
 <body>
+  <div id="popup-overlay" class="popup-overlay right" hidden role="dialog" aria-modal="true" aria-labelledby="popup-overlay-title">
+    <div class="popup-callout">
+      <span class="pointer" aria-hidden="true">⬆</span>
+      <h2 id="popup-overlay-title">Pop-ups were blocked!</h2>
+      <p id="popup-overlay-text">Look for the blocked pop-up icon in your address bar.</p>
+      <button type="button" id="popup-overlay-close">I've allowed pop-ups — close</button>
+    </div>
+  </div>
   <main>
     <p class="eyebrow">Game night</p>
     <h1>Daily Games 🎮</h1>
@@ -34,6 +52,12 @@
         <button class="secondary" id="toggle" type="button">Deselect all</button>
       </div>
       <p id="status" class="status" aria-live="polite"></p>
+      <button class="help-toggle" id="help-toggle" type="button" aria-expanded="false" aria-controls="popup-help">ⓘ How to allow multiple tabs in your browser</button>
+      <aside class="help-panel" id="popup-help" hidden>
+        <h2 id="help-heading">Allow pop-ups for this launcher</h2>
+        <ol id="help-steps"></ol>
+        <p>Only allow pop-ups for this launcher site, not every website. Then return here and click <strong>Launch selected games</strong> again. Some browsers may still restrict opening 16 tabs at once.</p>
+      </aside>
     </section>
     <footer>Links open in new tabs. Your selections are saved only in this browser.</footer>
   </main>
@@ -68,6 +92,63 @@
     const launchEl = document.getElementById('launch');
     const toggleEl = document.getElementById('toggle');
     const statusEl = document.getElementById('status');
+    const helpToggleEl = document.getElementById('help-toggle');
+    const helpPanelEl = document.getElementById('popup-help');
+    const helpStepsEl = document.getElementById('help-steps');
+    const helpHeadingEl = document.getElementById('help-heading');
+    const overlayEl = document.getElementById('popup-overlay');
+    const overlayTextEl = document.getElementById('popup-overlay-text');
+    const overlayCloseEl = document.getElementById('popup-overlay-close');
+    function showPopupArrow() {
+      const browser = popupInstructions().browser;
+      const side = browser === 'Firefox' ? 'left' : (browser === 'Safari' || browser === 'your browser' ? 'center' : 'right');
+      overlayEl.className = 'popup-overlay ' + side;
+      overlayTextEl.textContent = browser === 'Firefox'
+        ? 'Firefox: click the blocked pop-up icon on the LEFT of your address bar (or the notification bar). Choose “Allow pop-ups for this site”, then launch again.'
+        : browser === 'Google Chrome' || browser === 'Microsoft Edge'
+          ? browser + ': click the blocked pop-up icon on the RIGHT of your address bar. Always allow pop-ups for this site, then launch again.'
+          : browser === 'Safari'
+            ? 'Safari: open Safari → Settings → Websites → Pop-up Windows and set this site to Allow. Then launch again.'
+            : 'Find your browser’s blocked pop-up notification or site settings, allow pop-ups for this site, then launch again.';
+      overlayEl.hidden = false;
+      overlayCloseEl.focus();
+    }
+    function hidePopupArrow() {overlayEl.hidden=true;}
+    overlayCloseEl.addEventListener('click',hidePopupArrow);
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&!overlayEl.hidden)hidePopupArrow();});
+    function popupInstructions() {
+      const ua = navigator.userAgent;
+      if (/Firefox\//i.test(ua)) return { browser:'Firefox', steps:[
+        'Click Launch selected games once to trigger Firefox’s blocked-popup notification.',
+        'Click the popup-blocked icon on the LEFT side of the address bar (or Options/Preferences on the notification bar).',
+        'Choose “Allow pop-ups for this site” (wording may mention redirects).']};
+      if (/Edg\//i.test(ua)) return { browser:'Microsoft Edge', steps:[
+        'Click Launch selected games once.',
+        'Click the popup-blocked icon on the right of the address bar.',
+        'Choose the option to always allow pop-ups and redirects from this site, then confirm.']};
+      if (/Chrome\//i.test(ua)) return { browser:'Google Chrome', steps:[
+        'Click Launch selected games once.',
+        'Click the popup-blocked icon on the right of the address bar.',
+        'Choose “Always allow pop-ups and redirects from this site”, then click Done.']};
+      if (/Safari\//i.test(ua)) return { browser:'Safari', steps:[
+        'Open Safari → Settings → Websites → Pop-up Windows.',
+        'Find this launcher under currently open websites.',
+        'Set it to Allow.']};
+      return {browser:'your browser', steps:[
+        'Click Launch selected games once to trigger a popup-blocking notification.',
+        'Use the icon in the address bar or your browser’s site permissions to allow pop-ups for this launcher only.',
+        'If there is no notification, find pop-up exceptions in your browser privacy/site settings.']};
+    }
+    function setHelpVisible(visible) {
+      helpPanelEl.hidden = !visible;
+      helpToggleEl.setAttribute('aria-expanded', String(visible));
+      if (visible) {
+        const guide = popupInstructions();
+        helpHeadingEl.textContent = `Allow pop-ups in ${guide.browser}`;
+        helpStepsEl.replaceChildren(...guide.steps.map(step => {const li=document.createElement('li');li.textContent=step;return li;}));
+      }
+    }
+    helpToggleEl.addEventListener('click',()=>setHelpVisible(helpPanelEl.hidden));
     function save() { try { localStorage.setItem(storageKey, JSON.stringify(Object.fromEntries(selected))); } catch {} }
     function render() {
       gamesEl.replaceChildren();
@@ -90,8 +171,8 @@
       let opened=0;
       // Synchronous openings matter: deferring with a timer commonly triggers blockers.
       for(const url of urls){const tab=window.open(url,'_blank');if(tab){opened++;try{tab.opener=null;}catch{}}}
-      if(opened<urls.length){statusEl.className='status warn';statusEl.textContent=`${opened} of ${urls.length} tabs opened. Allow popups and redirects for this site in your browser, then click Launch again. (Some browsers may still limit bulk opening.)`;}
-      else{statusEl.className='status ok';statusEl.textContent=`Requested ${opened} tabs. If any are missing, check your browser's popup settings.`;}
+      if(opened<urls.length){statusEl.className='status warn';statusEl.textContent=`Browser reported ${opened} of ${urls.length} tabs opened. See the instructions below to allow pop-ups for this site, then try again.`;setHelpVisible(true);showPopupArrow();}
+      else{statusEl.className='status ok';statusEl.textContent=`Requested ${opened} tabs. If any are missing, use the popup help below; some browsers can block tabs even when a window handle is returned.`;}
     });
     render();
   </script>
